@@ -234,21 +234,100 @@ function App() {
                 title={theme === "light" ? "Switch to Dark (Rich Walnut)" : "Switch to Light (Espresso & Cream)"}
               >
                 <Icon name={theme === "light" ? "Moon" : "Sun"} size={15} />
-                <span>{theme === "light" ? "☕ Espresso & Cream" : "🌰 Rich Walnut"}</span>
+                <span className="theme-toggle-label">{theme === "light" ? "☕ Espresso & Cream" : "🌰 Rich Walnut"}</span>
               </button>
-              <button className="btn btn-secondary btn-sm" style={{ display: "none" }} onClick={() => setMobileMenu(v => !v)}>
-                <Icon name="Menu" size={16} />
+              <button className="mobile-menu-toggle" onClick={() => setMobileMenu(true)} title="Open navigation menu">
+                <Icon name="Menu" size={18} />
               </button>
               <div className="user-chip" onClick={() => setTab("Settings")}>
                 <div className="user-avatar">{(user.name || "U")[0].toUpperCase()}</div>
                 <span className="user-chip-name">{user.name?.split(" ")[0]}</span>
               </div>
-              <button className="btn btn-secondary btn-sm btn-icon" onClick={logout} title="Logout">
+              <button className="btn btn-secondary btn-sm btn-icon desktop-only" onClick={logout} title="Logout">
                 <Icon name="LogOut" size={16} />
               </button>
             </div>
           </div>
         </header>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenu && (
+          <>
+            <div className="mobile-drawer-overlay" onClick={() => setMobileMenu(false)} />
+            <div className="mobile-drawer">
+              <div className="mobile-drawer-header">
+                <div className="logo" style={{ cursor: "default" }}>
+                  <span className="logo-icon" style={{ width: 30, height: 30, fontSize: 14 }}>✦</span>
+                  PrepForge
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm btn-icon"
+                  onClick={() => setMobileMenu(false)}
+                  style={{ width: 32, height: 32, padding: 0 }}
+                  title="Close Menu"
+                >
+                  <Icon name="X" size={16} />
+                </button>
+              </div>
+
+              <div className="mobile-drawer-body">
+                {/* User chip summary */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--surface)", borderRadius: 12, marginBottom: 8 }}>
+                  <div className="user-avatar" style={{ width: 36, height: 36, fontSize: 15 }}>{(user.name || "U")[0].toUpperCase()}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{user.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{user.target_role || user.email}</div>
+                  </div>
+                </div>
+
+                <div className="sidebar-label" style={{ padding: "8px 10px 4px" }}>Menu</div>
+                {NAV_MAIN.map(({ name, icon }) => (
+                  <button
+                    key={name}
+                    className={`nav-btn ${tab === name ? "active" : ""}`}
+                    onClick={() => { setTab(name); setMobileMenu(false); }}
+                  >
+                    <Icon name={icon} size={16} className="nav-icon" />{name}
+                  </button>
+                ))}
+
+                <div className="sidebar-label" style={{ marginTop: 14, padding: "8px 10px 4px" }}>AI Tools</div>
+                {TOOL_GROUPS.map(g => (
+                  <div key={g.title} style={{ marginBottom: 4 }}>
+                    <div className="sidebar-label" style={{ padding: "4px 10px 2px", fontSize: 10, color: "var(--accent)" }}>{g.title}</div>
+                    {g.items.map(([short, full]) => (
+                      <button
+                        key={full}
+                        className={`nav-sub ${tab === full ? "active" : ""}`}
+                        onClick={() => { setTab(full); setMobileMenu(false); }}
+                      >
+                        {short}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mobile-drawer-footer">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ width: "100%", justifyContent: "center" }}
+                  onClick={toggleTheme}
+                >
+                  <Icon name={theme === "light" ? "Moon" : "Sun"} size={14} />
+                  <span>{theme === "light" ? "Switch to Rich Walnut" : "Switch to Espresso & Cream"}</span>
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  style={{ width: "100%", justifyContent: "center" }}
+                  onClick={logout}
+                >
+                  <Icon name="LogOut" size={14} /> Log out
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Body */}
         <div className="main-layout">
@@ -257,6 +336,45 @@ function App() {
             <Content tab={tab} setTab={setTab} />
           </main>
         </div>
+
+        {/* Mobile Quick-Action Bottom Bar */}
+        <nav className="mobile-bottom-nav">
+          <button
+            className={`bottom-nav-item ${tab === "Dashboard" ? "active" : ""}`}
+            onClick={() => setTab("Dashboard")}
+          >
+            <Icon name="Dashboard" size={18} className="bottom-nav-icon" />
+            <span>Home</span>
+          </button>
+          <button
+            className={`bottom-nav-item ${tab === "Resume & JD" ? "active" : ""}`}
+            onClick={() => setTab("Resume & JD")}
+          >
+            <Icon name="FileText" size={18} className="bottom-nav-icon" />
+            <span>CV & JD</span>
+          </button>
+          <button
+            className={`bottom-nav-item ${tab === "AI Practice Pack" ? "active" : ""}`}
+            onClick={() => setTab("AI Practice Pack")}
+          >
+            <Icon name="Target" size={18} className="bottom-nav-icon" />
+            <span>Practice</span>
+          </button>
+          <button
+            className={`bottom-nav-item ${tab.includes("Voice") ? "active" : ""}`}
+            onClick={() => setTab("Voice Mock — HR")}
+          >
+            <Icon name="Mic" size={18} className="bottom-nav-icon" />
+            <span>Voice</span>
+          </button>
+          <button
+            className="bottom-nav-item"
+            onClick={() => setMobileMenu(true)}
+          >
+            <Icon name="Menu" size={18} className="bottom-nav-icon" />
+            <span>All Tools</span>
+          </button>
+        </nav>
       </div>
     </Ctx.Provider>
   );
@@ -455,7 +573,7 @@ function Dashboard({ setTab }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
+      <div className="dashboard-main-grid">
         {/* Next moves */}
         <div className="card" style={{ padding: 24 }}>
           <h2 style={{ fontWeight: 800, marginBottom: 20 }}>Your next best moves</h2>
@@ -1289,7 +1407,7 @@ function Aptitude() {
 
       {/* Controls */}
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 100px 120px", gap: 12, alignItems: "end" }}>
+        <div className="apt-controls-grid">
           <div className="input-group">
             <label className="input-label">Topic</label>
             <select className="input" value={topic} onChange={e => setTopic(e.target.value)}>
@@ -1443,7 +1561,7 @@ function VoiceInterview({ tab }) {
         <h1 className="section-title">Voice Mock Interview</h1>
         <p className="section-desc">A real adaptive AI interviewer. Answer by voice or type — get instant feedback.</p>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
+      <div className="voice-grid">
         {/* Main panel */}
         <div className="card" style={{ padding: 28 }}>
           <div className="badge badge-indigo" style={{ marginBottom: 20 }}>Live session · {mode} mode</div>
