@@ -87,4 +87,35 @@ export function ensureUserData(userId) {
   stmt.ensureJd.run(userId);
 }
 
+// ── Seed Demo Accounts ────────────────────────────────────────────────────────
+try {
+  import("bcryptjs").then(({ default: bcrypt }) => {
+    const demoUsers = [
+      { email: "demo@prepforge.com", name: "Demo Candidate", role: "Software Engineer", branch: "CSE" },
+      { email: "test@demo.com", name: "Test User", role: "Frontend Developer", branch: "IT" }
+    ];
+    
+    bcrypt.hash("password123", 10).then(hashed => {
+      for (const u of demoUsers) {
+        const found = db.prepare("SELECT id FROM users WHERE email = ?").get(u.email);
+        if (!found) {
+          const res = db.prepare(
+            "INSERT INTO users (name, email, password, target_role, branch) VALUES (?,?,?,?,?)"
+          ).run(u.name, u.email, hashed, u.role, u.branch);
+          
+          db.prepare("INSERT OR IGNORE INTO resumes (user_id, text, file_name) VALUES (?,?,?)").run(
+            res.lastInsertRowid,
+            "Full-Stack Developer with 2+ years of experience in React, Node.js, Express, PostgreSQL, REST APIs, and Cloud Architecture. Built real-time collaborative applications, optimized database query performance by 40%, and implemented secure JWT-based authentication systems.",
+            "Resume.pdf"
+          );
+          db.prepare("INSERT OR IGNORE INTO jd (user_id, text) VALUES (?,?)").run(
+            res.lastInsertRowid,
+            "Senior Frontend / Full-Stack Engineer. Required: React, Node.js, TypeScript, RESTful APIs, System Design. Nice to have: Docker, CI/CD, Cloud Deployment, Performance Optimization."
+          );
+        }
+      }
+    }).catch(() => {});
+  });
+} catch {}
+
 export default db;

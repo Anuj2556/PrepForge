@@ -404,6 +404,34 @@ function AuthPage({ mode, setMode, onLogin }) {
     finally { setBusy(false); }
   }
 
+  async function fillDemo() {
+    setError(""); setBusy(true);
+    try {
+      let res = await fetch(`${BASE}/auth/login`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "demo@prepforge.com", password: "password123" })
+      });
+      let data = await res.json();
+      if (!res.ok) {
+        // If demo user not yet in db, auto-register it
+        res = await fetch(`${BASE}/auth/register`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: "Demo Candidate", email: "demo@prepforge.com",
+            password: "password123", targetRole: "Software Engineer", branch: "CSE"
+          })
+        });
+        data = await res.json();
+      }
+      if (data.token && data.user) onLogin(data.token, data.user);
+      else throw new Error(data.error || "Failed to log in with demo account");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="auth-shell">
       <div className="card auth-card fade-up">
@@ -438,15 +466,39 @@ function AuthPage({ mode, setMode, onLogin }) {
             <label className="input-label">Password{mode === "register" && " (min 8 chars)"}</label>
             <input className="input" type="password" placeholder="••••••••" value={form.password} onChange={set("password")} required />
           </div>
-          {error && <div className="alert-error">{error}</div>}
+          {error && (
+            <div className="alert-error" style={{ lineHeight: 1.5 }}>
+              {error}
+              {mode === "login" && error.includes("Invalid") && (
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>
+                  💡 Fresh deployment? Click <strong>Sign up free</strong> below or use <strong>1-Click Demo Login</strong>.
+                </div>
+              )}
+            </div>
+          )}
           <button className="btn btn-primary btn-lg" type="submit" disabled={busy}>
             {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
             {!busy && <Icon name="ArrowRight" size={16} />}
           </button>
         </form>
 
+        {mode === "login" && (
+          <div style={{ marginTop: 14 }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ width: "100%", padding: "10px", fontSize: 13, gap: 8 }}
+              onClick={fillDemo}
+              disabled={busy}
+            >
+              <Icon name="Sparkles" size={15} style={{ color: "var(--accent)" }} />
+              1-Click Demo Login (Instant Access)
+            </button>
+          </div>
+        )}
+
         <div className="auth-switch">
-          {mode === "login" ? <>Don't have an account?{" "}<button onClick={() => { setMode("register"); }}>Sign up free</button></> : <>Already have an account?{" "}<button onClick={() => setMode("login")}>Sign in</button></>}
+          {mode === "login" ? <>Don't have an account?{" "}<button onClick={() => { setMode("register"); setError(""); }}>Sign up free</button></> : <>Already have an account?{" "}<button onClick={() => { setMode("login"); setError(""); }}>Sign in</button></>}
         </div>
       </div>
     </div>
