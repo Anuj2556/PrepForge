@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "install:all": "npm --prefix client install && npm --prefix server install",
-    "build": "cd client && npm install --include=optional --no-audit --no-fund && npm run build && cd ../server && npm install --include=optional --no-audit --no-fund",
+    "build": "cd client && npm install --legacy-peer-deps --no-audit --no-fund && npm run build && cd ../server && npm install --legacy-peer-deps --no-audit --no-fund",
     "start": "node server/index.js",
     "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\""
   },
