@@ -26,19 +26,8 @@ app.use((req, res, next) => {
 });
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  process.env.CLIENT_URL
-].filter(Boolean);
-
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
-      return callback(null, true);
-    }
-    callback(new Error("Blocked by CORS policy"));
-  },
+  origin: true,
   credentials: true
 }));
 
@@ -644,12 +633,25 @@ app.post("/api/attempt", auth, (req, res) => {
 // ─── Production Static Serving ────────────────────────────────────────────────
 const clientDist = path.join(__dirname, "../client/dist");
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  app.use(express.static(clientDist, {
+    maxAge: "1d",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".css")) res.setHeader("Content-Type", "text/css");
+      if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) res.setHeader("Content-Type", "application/javascript");
+    }
+  }));
   app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) return next();
+    if (req.path.startsWith("/api")) return next();
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
+
+// ─── Global Error Handler ─────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({ error: err.message || "Internal server error" });
+});
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () =>
