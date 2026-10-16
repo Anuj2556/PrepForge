@@ -1,0 +1,13 @@
+{
+  "name": "prepforge",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix client install && npm --prefix server install",
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "start": "node server/index.js",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\""
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.3.3"
+  }
+}

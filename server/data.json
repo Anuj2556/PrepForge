@@ -1,0 +1,17 @@
+{
+  "profile": {
+    "name": "Demo Candidate",
+    "email": "demo@example.com",
+    "branch": "Information Technology",
+    "targetRole": "Software Developer"
+  },
+  "resume": {
+    "text": "React JavaScript Node.js Express MongoDB Python Java REST API Git GitHub",
+    "fileName": ""
+  },
+  "jd": {
+    "text": "Looking for a software developer with JavaScript, React, Node.js, REST APIs, SQL, Git and problem solving."
+  },
+  "history": [],
+  "saved": []
+}
