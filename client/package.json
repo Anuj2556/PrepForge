@@ -20,5 +20,9 @@
     "react-router-dom": "latest",
     "tailwindcss": "latest",
     "vite": "latest"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "*",
+    "@rollup/rollup-linux-x64-gnu": "*"
   }
 }
