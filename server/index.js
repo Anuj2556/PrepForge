@@ -39,35 +39,50 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const GROQ_MODEL   = process.env.GROQ_MODEL   || "openai/gpt-oss-120b";
 const GROQ_MODELS  = [GROQ_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"];
 
-async function askAI(prompt, maxTokens = 1800, jsonMode = false) {
+function detectTechStack(resumeText = "", jdText = "", targetRole = "", branch = "") {
+  const combined = `${targetRole} ${branch} ${resumeText} ${jdText}`.toLowerCase();
+  const KNOWN_TECHS = [
+    "Python", "Java", "C++", "C#", "Golang", "Go", "Rust", "TypeScript", "JavaScript", "PHP", "Ruby", "Swift", "Kotlin", "Scala", "Dart", "C",
+    "React", "Next.js", "Vue", "Angular", "Svelte", "HTML5", "CSS3", "Tailwind CSS", "Redux", "Flutter", "React Native",
+    "Node.js", "Express", "Django", "FastAPI", "Flask", "Spring Boot", "Spring", ".NET", "ASP.NET", "Laravel", "Ruby on Rails", "NestJS",
+    "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "Cassandra", "SQLite", "Oracle", "DynamoDB", "Prisma",
+    "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "CI/CD", "Linux", "Jenkins", "Ansible", "Nginx",
+    "Machine Learning", "Deep Learning", "PyTorch", "TensorFlow", "Pandas", "NumPy", "Scikit-Learn", "Data Science", "LLM", "NLP", "OpenCV",
+    "Microservices", "System Design", "REST APIs", "GraphQL", "gRPC", "Apache Kafka", "RabbitMQ", "Distributed Systems", "WebSockets"
+  ];
+  const detected = [];
+  for (const tech of KNOWN_TECHS) {
+    const escaped = tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(^|[^a-zA-Z0-9+#.-])${escaped}([^a-zA-Z0-9+#.-]|$)`, 'i');
+    if (regex.test(combined)) detected.push(tech);
+  }
+  return detected;
+}
+
+async function askAI(prompt, maxTokens = 1800, jsonMode = false, systemContent = null, temp = 0.65) {
   if (!GROQ_API_KEY || !GROQ_API_KEY.startsWith("gsk_")) {
     return { ok: false, error: "GROQ_API_KEY not configured or invalid." };
   }
 
   const models = [...new Set(GROQ_MODELS)];
   let lastError = "Unknown error";
+  const defaultSystem = jsonMode
+    ? "You are an aptitude question generator. Output ONLY a valid JSON object. Never output markdown fences or reasoning text outside the JSON."
+    : "You are an expert Principal Technical Interviewer and career mentor for PrepForge. Be strictly technical, precise, and never generate generic boilerplate.";
 
   for (const m of models) {
     try {
-      // Qwen on Groq free tier has an OTPM limit of 1000 tokens
       const tokenCap = m.includes("qwen") ? Math.min(maxTokens, 850) : maxTokens;
       const body = {
         model: m,
         messages: [
-          {
-            role: "system",
-            content: jsonMode
-              ? "You are an aptitude question generator. Output ONLY a valid JSON object. Never output markdown fences or reasoning text outside the JSON."
-              : "You are an expert AI interview and career mentor for PrepForge. Be accurate, structured, and strictly concise."
-          },
+          { role: "system", content: systemContent || defaultSystem },
           { role: "user", content: prompt }
         ],
         max_tokens: tokenCap,
-        temperature: 0.2
+        temperature: temp
       };
-      if (jsonMode) {
-        body.response_format = { type: "json_object" };
-      }
+      if (jsonMode) body.response_format = { type: "json_object" };
 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -258,6 +273,20 @@ Return ONLY a JSON array of 3 gap strings, no markdown. Example: ["Gap 1","Gap 2
 // ═══════════════════════════════════════════════════════════════════════════════
 // AI-GENERATED QUESTION PACKS (personalized per user)
 // ═══════════════════════════════════════════════════════════════════════════════
+// DETECTED TECH STACK
+// ═══════════════════════════════════════════════════════════════════════════════
+app.get("/api/tech-stack", auth, (req, res) => {
+  const uid = req.user.id;
+  const user = stmt.getUserById.get(uid);
+  const resume = stmt.getResume.get(uid) || { text: "" };
+  const jdRow = stmt.getJd.get(uid) || { text: "" };
+  const detected = detectTechStack(resume.text, jdRow.text, user?.target_role, user?.branch);
+  res.json({ detected, targetRole: user?.target_role || "" });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI-GENERATED QUESTION PACKS (technology-specialized)
+// ═══════════════════════════════════════════════════════════════════════════════
 app.post("/api/questions/generate", auth, async (req, res) => {
   const uid = req.user.id;
   const user = stmt.getUserById.get(uid);
@@ -266,28 +295,47 @@ app.post("/api/questions/generate", auth, async (req, res) => {
   const kind = req.body.kind || "Technical Q&A";
   const count = Math.min(parseInt(req.body.count) || 8, 15);
 
-  const contextLine = `
-Candidate: ${user?.name || "Candidate"} | Role: ${user?.target_role || "Software Developer"} | Branch: ${user?.branch || "IT"}
-Resume (first 800 chars): ${(resume.text || "").slice(0, 800)}
-JD (first 400 chars): ${(jdRow.text || "").slice(0, 400)}`;
+  const detectedStack = detectTechStack(resume.text, jdRow.text, user?.target_role, user?.branch);
+  const selectedTech = (req.body.technology && req.body.technology !== "All Technologies" && req.body.technology !== "Auto-detect from CV")
+    ? req.body.technology
+    : (detectedStack.slice(0, 5).join(", ") || user?.target_role || "Software Engineering");
+
+  const techMandate = `
+TARGET TECHNOLOGY FOCUS: ${selectedTech}
+CANDIDATE DETECTED STACK: ${detectedStack.join(", ") || "General"}
+TARGET ROLE: ${user?.target_role || "Engineer"} (${user?.branch || "CS/IT"})
+
+STRICT SPECIALIZATION RULES:
+1. Every question MUST be written specifically for ${selectedTech}. Do NOT generate generic web development questions unless ${selectedTech} is explicitly web.
+2. For Java: focus on JVM memory/GC, multithreading, Spring Boot internals, Hibernate performance.
+3. For Python: focus on GIL, memory model, async/await asyncio, framework internals (Django/FastAPI).
+4. For C/C++: focus on pointers, memory layouts, RAII, vtables, cache misses, move semantics.
+5. For React: focus on Fiber reconciliation, state machines, render bottlenecks, concurrent features.
+6. For Cloud/DevOps: focus on Kubernetes controllers, Terraform state locking, Docker layer caching.
+7. For ML/Data: focus on model architectures, loss functions, GPU memory optimization, embeddings.
+8. Ask probing, production-grade questions testing real-world architectural trade-offs.`;
 
   const kindPrompts = {
-    "Project Deep-Dive": `Generate ${count} deep technical interview questions specifically about the projects and technologies mentioned in the candidate's resume. Make them very specific to their actual experience.`,
-    "Technical Q&A": `Generate ${count} technical interview questions tailored to the candidate's branch, skills and target role. Mix conceptual, practical and problem-solving questions.`,
-    "HR / Soft Skills": `Generate ${count} behavioral HR interview questions relevant to the candidate's target role. Include STAR-framework prompts, leadership, conflict and motivation questions.`,
-    "JD Predictor": `Analyze the job description and generate the ${count} most likely interview questions this company will ask. Be specific to the JD's requirements.`,
-    "Company-Pattern Mock": `Generate ${count} realistic mock interview questions based on the company type/domain in the JD. Mix technical, behavioral and scenario-based questions.`,
+    "Project Deep-Dive": `Generate ${count} deep technical interview questions specifically investigating the implementation details, architectural trade-offs, scalability bottlenecks, and failure modes of projects using ${selectedTech} in the candidate's resume.`,
+    "Technical Q&A": `Generate ${count} advanced, framework-specific technical interview questions directly testing deep knowledge of ${selectedTech}. Mix architectural internals, edge cases, and real production debugging.`,
+    "HR / Soft Skills": `Generate ${count} behavioral and leadership interview questions tailored for a ${user?.target_role || "Software Engineer"} working with ${selectedTech} teams (handling technical disagreements, delivery pressure, code review conflicts, system outages).`,
+    "JD Predictor": `Analyze the target job description and generate the ${count} most probable technical interview questions specifically grilling the candidate on ${selectedTech} as required by this company.`
   };
 
-  const promptText = kindPrompts[kind] || `Generate ${count} tailored interview preparation questions for: ${kind}`;
+  const prompt = `${kindPrompts[kind] || `Generate ${count} deep technical questions for ${selectedTech}`}
 
-  const prompt = `${promptText}
-${contextLine}
+${techMandate}
+
+Candidate Resume:
+${(resume.text || "").slice(0, 3200)}
+
+Target JD:
+${(jdRow.text || "").slice(0, 1600)}
 
 Return ONLY a JSON array of ${count} question strings. No markdown, no numbering, just the array.
-Example: ["Question 1?","Question 2?"]`;
+Example: ["In ${selectedTech}, how does... ?","What happens internally when... ?"]`;
 
-  const result = await askAI(prompt, 1200);
+  const result = await askAI(prompt, 1800, false, null, 0.7);
   if (!result.ok) return res.status(503).json({ error: result.error });
 
   try {
@@ -296,7 +344,6 @@ Example: ["Question 1?","Question 2?"]`;
     if (!Array.isArray(qs)) throw new Error("Not an array");
     res.json(qs);
   } catch {
-    // Fallback: extract lines that look like questions
     const lines = result.text.split("\n")
       .map(l => l.replace(/^[\d\-•*.]+\s*/, "").trim())
       .filter(l => l.length > 10 && l.includes(" "));
@@ -304,7 +351,6 @@ Example: ["Question 1?","Question 2?"]`;
   }
 });
 
-// Legacy GET route (kept for backward compat — returns empty, client uses POST now)
 app.get("/api/questions/:kind", (req, res) => res.json([]));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -594,23 +640,34 @@ app.post("/api/ai/generate", auth, async (req, res) => {
   const resume = stmt.getResume.get(uid) || { text: "" };
   const jdRow = stmt.getJd.get(uid) || { text: "" };
 
-  const prompt = `You are an interview-preparation assistant.
+  const detectedStack = detectTechStack(resume.text, jdRow.text, user?.target_role, user?.branch);
+  const selectedTech = (req.body.technology && req.body.technology !== "All Technologies" && req.body.technology !== "Auto-detect from CV")
+    ? req.body.technology
+    : (detectedStack.slice(0, 6).join(", ") || user?.target_role || "Software Engineering");
 
-Candidate: ${user?.name || "Candidate"} — ${user?.target_role || "Developer"} (${user?.branch || "IT"})
+  const systemContent = `You are a Principal Software Architect and Lead Technical Interviewer at top-tier tech companies.
+CRITICAL MANDATE:
+1. Every answer, note, or code snippet MUST be deeply technical and 100% specific to the candidate's exact technologies: ${selectedTech}.
+2. NEVER produce generic, one-size-fits-all output. If the technology is Java, talk about JVM/Spring/GC. If Python, talk about GIL/AsyncIO/Framework internals. If C++, talk about memory/RAII/templates. If React, talk about Fiber/reconciliation/hooks.
+3. Include real code examples, edge cases, failure scenarios, and architectural trade-offs.`;
 
-Resume:
+  const prompt = `Candidate: ${user?.name || "Candidate"} — ${user?.target_role || "Developer"} (${user?.branch || "IT"})
+Target Technology Focus: ${selectedTech}
+Detected Full Stack: ${detectedStack.join(", ") || "General Engineering"}
+
+Candidate Resume:
 ${resume.text || "(none)"}
 
-Target JD:
+Target Job Description:
 ${jdRow.text || "(none)"}
 
-Task: ${req.body.prompt || "Generate useful interview preparation content."}
+Task Requested: ${req.body.prompt || "Generate useful interview preparation content."}
 
-Return concise, practical content formatted with markdown headings, bullet points, and code blocks where appropriate.`;
+Formatting: Return concise, practical, highly specialized content formatted with markdown headings (##, ###), bullet points, and code blocks where appropriate.`;
 
-  const result = await askAI(prompt, 2400);
+  const result = await askAI(prompt, 2600, false, systemContent, 0.65);
   if (!result.ok) return res.status(503).json(result);
-  res.json({ text: result.text });
+  res.json({ text: result.text, detectedTechs: detectedStack });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

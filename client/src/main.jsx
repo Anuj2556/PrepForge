@@ -508,11 +508,9 @@ function AuthPage({ mode, setMode, onLogin }) {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 const NAV_MAIN = [
   { name: "Dashboard", icon: "Dashboard" },
-  { name: "UI/UX Showcase", icon: "Sparkles" },
   { name: "Resume & JD", icon: "FileText" },
   { name: "Practice", icon: "Target" },
   { name: "History", icon: "History" },
-  { name: "Resources", icon: "BookOpen" },
   { name: "Settings", icon: "Settings" },
 ];
 const TOOL_GROUPS = [
@@ -551,13 +549,11 @@ function Sidebar({ tab, setTab }) {
 
 // ─── Content router ───────────────────────────────────────────────────────────
 function Content({ tab, setTab }) {
-  const { state, theme, toggleTheme } = React.useContext(Ctx);
+  const { state } = React.useContext(Ctx);
   if (!state) return <Loading />;
   if (tab === "Dashboard")       return <Dashboard setTab={setTab} />;
-  if (tab === "UI/UX Showcase")  return <DesignShowcase theme={theme} toggleTheme={toggleTheme} setTab={setTab} />;
   if (tab === "Resume & JD")     return <ResumeJD />;
   if (tab === "History")         return <HistoryPage />;
-  if (tab === "Resources")       return <Resources />;
   if (tab === "Settings")        return <SettingsPage />;
   if (tab === "Practice" || tab === "Aptitude Practice") return <Aptitude key={tab} />;
   if (tab === "Voice Mock — HR" || tab === "Voice Mock — Technical") return <VoiceInterview key={tab} tab={tab} />;
@@ -997,6 +993,112 @@ function ResumeJD() {
   );
 }
 
+// ─── Reusable Technology Selector Component ──────────────────────────────────
+const POPULAR_TECHS = [
+  "Java", "Python", "C++", "React", "Node.js", "TypeScript",
+  "Golang", "Spring Boot", "Django / FastAPI", "SQL / Databases",
+  "Docker & Kubernetes", "AWS / Cloud", "Machine Learning"
+];
+
+function TechSelector({ selectedTech, onSelectTech, label = "Target Technology / Framework" }) {
+  const [detected, setDetected] = useState([]);
+  const [isCustom, setIsCustom] = useState(false);
+  const [customVal, setCustomVal] = useState("");
+
+  useEffect(() => {
+    api("GET", "/tech-stack")
+      .then(res => {
+        if (res?.detected && Array.isArray(res.detected)) {
+          setDetected(res.detected);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const uniqueTechs = Array.from(new Set([
+    "Auto-detect from CV",
+    ...detected,
+    ...POPULAR_TECHS
+  ]));
+
+  return (
+    <div style={{ marginBottom: 18, background: "var(--surface)", padding: "14px 16px", borderRadius: 12, border: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--accent)" }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          Active: <strong style={{ color: "var(--text)" }}>{selectedTech || "Auto-detect from CV"}</strong>
+        </div>
+      </div>
+
+      {/* Quick Click Badges / Chips */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {uniqueTechs.slice(0, 14).map(tech => {
+          const isSelected = selectedTech === tech;
+          return (
+            <button
+              key={tech}
+              type="button"
+              className={`badge ${isSelected ? "badge-indigo" : "badge-outline"}`}
+              style={{
+                cursor: "pointer",
+                padding: "5px 12px",
+                fontSize: 12,
+                borderRadius: 8,
+                border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                background: isSelected ? "rgba(212, 163, 115, 0.18)" : "transparent",
+                color: isSelected ? "var(--accent)" : "var(--text-muted)",
+                fontWeight: isSelected ? 700 : 500,
+                transition: "all 0.15s ease"
+              }}
+              onClick={() => {
+                setIsCustom(false);
+                onSelectTech(tech);
+              }}
+            >
+              {tech === "Auto-detect from CV" && "🎯 "}
+              {tech}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className={`badge ${isCustom ? "badge-indigo" : "badge-outline"}`}
+          style={{
+            cursor: "pointer",
+            padding: "5px 12px",
+            fontSize: 12,
+            borderRadius: 8,
+            border: isCustom ? "1px solid var(--accent)" : "1px solid var(--border)",
+            background: isCustom ? "rgba(212, 163, 115, 0.18)" : "transparent",
+            color: isCustom ? "var(--accent)" : "var(--text-muted)",
+            fontWeight: isCustom ? 700 : 500
+          }}
+          onClick={() => setIsCustom(!isCustom)}
+        >
+          ✏️ Custom Tech...
+        </button>
+      </div>
+
+      {isCustom && (
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <input
+            className="input"
+            style={{ padding: "8px 12px", fontSize: 13 }}
+            placeholder="Type any technology, framework or tool (e.g. Rust, PyTorch, Kubernetes, GraphQL, Spring Cloud)"
+            value={customVal}
+            onChange={e => {
+              setCustomVal(e.target.value);
+              onSelectTech(e.target.value || "Auto-detect from CV");
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Feature page (AI tools) ──────────────────────────────────────────────────
 const FEATURE_DESC = {
   "Project Deep-Dive Q&A": "Deep technical questions tailored to your resume projects.",
@@ -1016,8 +1118,8 @@ const FEATURE_DESC = {
 };
 const FEATURE_PROMPTS = {
   "Project Deep-Dive Q&A": "Generate 10 deep technical interview questions about each project mentioned in the resume. For each question include a model answer. Format with ## per project.",
-  "Technical Q&A": "Generate 15 technical interview questions relevant to the candidate's branch and skills. Include concise model answers. Format as numbered list with bold answers.",
-  "Topic-Wise Revision Notes": "Create concise revision notes for each major technical topic in the resume. Include formulas, concepts, and quick memory aids. Use ## headings per topic.",
+  "Technical Q&A": "Generate 15 advanced technical interview questions relevant to the candidate's skills and chosen technology. Include deep model answers with code snippets and production edge cases. Format as numbered list with bold answers.",
+  "Topic-Wise Revision Notes": "Create concise revision notes for each major technical topic in the resume and chosen technology. Include formulas, internal architecture concepts, and quick memory aids. Use ## headings per topic.",
   "AI STAR Story Builder": "Extract 5 experiences from the resume and convert each into a STAR-format story (Situation, Task, Action, Result). Make them concise and impactful.",
   "Tell Me About Yourself": "Generate three versions of 'Tell me about yourself': 1) For a technical round, 2) For an HR round, 3) A 30-second elevator pitch. Based on the resume and JD.",
   "HR / Soft Skills": "Generate 12 HR interview questions tailored to the role with STAR-framework answer guides. Include: motivation, teamwork, conflict, failure, leadership questions.",
@@ -1037,8 +1139,18 @@ function FeaturePage({ name }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [technology, setTechnology] = useState("Auto-detect from CV");
   const desc = FEATURE_DESC[name] || "AI-powered personalized preparation.";
   const prompt = FEATURE_PROMPTS[name];
+
+  const isTechTool = [
+    "Technical Q&A",
+    "Project Deep-Dive Q&A",
+    "Topic-Wise Revision Notes",
+    "Company-Pattern Mock Tests",
+    "JD Predictor",
+    "Interview Round Guide"
+  ].includes(name);
 
   // Reset state completely when switching tabs
   useEffect(() => {
@@ -1052,7 +1164,12 @@ function FeaturePage({ name }) {
     if (!state.resume?.text) { setError("Please add your resume in the Resume & JD tab first."); return; }
     setLoading(true); setError(""); setResult(null);
     try {
-      const data = await api("POST", "/ai/generate", { prompt: prompt || `Generate interview preparation content for: ${name}` });
+      const techFocus = (isTechTool && technology && technology !== "Auto-detect from CV") ? technology : null;
+      const fullPrompt = prompt || `Generate interview preparation content for: ${name}`;
+      const data = await api("POST", "/ai/generate", { 
+        prompt: techFocus ? `${fullPrompt}\n\nSTRICT REQUIREMENT: Tailor all questions, answers, architectural trade-offs, and code snippets specifically to ${techFocus}. Do NOT generate generic content.` : fullPrompt,
+        technology: techFocus || undefined
+      });
       setResult(data.text);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -1089,9 +1206,24 @@ function FeaturePage({ name }) {
             <Icon name="Brain" size={24} />
           </div>
         </div>
+
+        {isTechTool && (
+          <div style={{ marginTop: 18 }}>
+            <TechSelector
+              selectedTech={technology}
+              onSelectTech={setTechnology}
+              label={`Technology / Framework Focus for ${name}`}
+            />
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap", alignItems: "center" }}>
           <button className="btn btn-primary" onClick={generate} disabled={loading}>
-            {loading ? <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />Generating…</> : <><Icon name="Zap" size={16} />{result ? "Regenerate" : "Generate"}</>}
+            {loading ? (
+              <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />Generating {isTechTool && technology !== "Auto-detect from CV" ? `for ${technology}` : ""}…</>
+            ) : (
+              <><Icon name="Zap" size={16} />{result ? `Regenerate ${isTechTool && technology !== "Auto-detect from CV" ? `(${technology})` : ""}` : `Generate ${isTechTool && technology !== "Auto-detect from CV" ? `(${technology})` : ""}`}</>
+            )}
           </button>
           {result && (
             <>
@@ -1109,7 +1241,16 @@ function FeaturePage({ name }) {
         {error && <div className="alert-error" style={{ marginTop: 16 }}>{error}</div>}
       </div>
 
-      {result && <Markdown text={result} />}
+      {result && (
+        <div>
+          {isTechTool && technology !== "Auto-detect from CV" && (
+            <div style={{ marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 8, background: "rgba(212, 163, 115, 0.15)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
+              <span>Specialized Focus:</span> {technology}
+            </div>
+          )}
+          <Markdown text={result} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1125,6 +1266,7 @@ const PRACTICE_PACK_TOPICS = [
 function PracticePackPage() {
   const { state } = React.useContext(Ctx);
   const [topic, setTopic] = useState("Technical Q&A");
+  const [technology, setTechnology] = useState("Auto-detect from CV");
   const [count, setCount] = useState(8);
   const [qs, setQs] = useState([]);
   const [open, setOpen] = useState({});
@@ -1137,7 +1279,11 @@ function PracticePackPage() {
     setError("");
     setOpen({});
     try {
-      const data = await api("POST", "/questions/generate", { kind: topic, count });
+      const data = await api("POST", "/questions/generate", { 
+        kind: topic, 
+        count, 
+        technology: (technology && technology !== "Auto-detect from CV") ? technology : undefined 
+      });
       setQs(Array.isArray(data) ? data : []);
       setHasGenerated(true);
     } catch (e) {
@@ -1153,7 +1299,7 @@ function PracticePackPage() {
         <div className="section-eyebrow">Practice Module</div>
         <h1 className="section-title">AI Practice Pack</h1>
         <p className="section-desc">
-          Generate targeted, high-yield practice interview questions tailored to your profile.
+          Generate targeted, high-yield practice interview questions tailored to your profile and exact tech stack.
           Practice answering out loud or using the STAR method.
         </p>
       </div>
@@ -1171,6 +1317,13 @@ function PracticePackPage() {
             <Icon name="Target" size={24} />
           </div>
         </div>
+
+        {/* Technology Selection */}
+        <TechSelector
+          selectedTech={technology}
+          onSelectTech={setTechnology}
+          label="Target Technology / Framework Focus"
+        />
 
         {/* Topic tabs */}
         <div style={{ marginBottom: 20 }}>
@@ -1207,9 +1360,9 @@ function PracticePackPage() {
 
         <button className="btn btn-primary" onClick={generate} disabled={loading}>
           {loading ? (
-            <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />Generating {count} Questions…</>
+            <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />Generating {count} Questions for {technology !== "Auto-detect from CV" ? technology : topic}…</>
           ) : (
-            <><Icon name="Zap" size={16} />{hasGenerated ? "Regenerate Fresh Questions" : `Generate ${count} ${topic} Questions`}</>
+            <><Icon name="Zap" size={16} />{hasGenerated ? `Regenerate Fresh Questions (${technology !== "Auto-detect from CV" ? technology : topic})` : `Generate ${count} ${technology !== "Auto-detect from CV" ? technology : topic} Questions`}</>
           )}
         </button>
 
@@ -1229,7 +1382,7 @@ function PracticePackPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
             <div>
               <h2 style={{ fontWeight: 800, fontSize: 18 }}>Generated Practice Questions ({qs.length})</h2>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Focus: {topic} · Click each question to reveal answering guidance.</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Focus: {topic} {technology !== "Auto-detect from CV" ? `(${technology})` : ""} · Click each question to reveal answering guidance.</div>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={() => {
               const allOpen = Object.keys(open).length === qs.length;
@@ -1734,39 +1887,6 @@ function HistoryPage() {
   );
 }
 
-// ─── Resources ────────────────────────────────────────────────────────────────
-const RESOURCES = [
-  { title: "JavaScript Fundamentals", desc: "Closures, prototypes, async/await, event loop.", emoji: "⚡" },
-  { title: "React Interview Checklist", desc: "Hooks, reconciliation, context, optimization.", emoji: "⚛️" },
-  { title: "Node.js & Express", desc: "Middleware, routing, streams, error handling.", emoji: "🟢" },
-  { title: "SQL Practice", desc: "Joins, subqueries, indexes, transactions.", emoji: "🗄️" },
-  { title: "DSA Patterns", desc: "Two-pointer, sliding window, BFS/DFS, DP.", emoji: "📊" },
-  { title: "System Design Basics", desc: "Load balancing, caching, databases, CAP.", emoji: "🏗️" },
-  { title: "Git & GitHub", desc: "Branching, merging, rebasing, pull requests.", emoji: "🐙" },
-  { title: "REST API Security", desc: "JWT, OAuth, CORS, rate limiting, HTTPS.", emoji: "🔒" },
-  { title: "HR Answer Framework", desc: "STAR method, common questions, body language.", emoji: "🤝" },
-];
-
-function Resources() {
-  return (
-    <div>
-      <div style={{ marginBottom: 28 }}>
-        <div className="section-eyebrow">Free</div>
-        <h1 className="section-title">Interview Resources</h1>
-        <p className="section-desc">No-paywall resources to strengthen your interview preparation.</p>
-      </div>
-      <div className="grid-auto">
-        {RESOURCES.map(r => (
-          <div key={r.title} className="card" style={{ padding: 24 }}>
-            <div style={{ fontSize: 32, marginBottom: 14 }}>{r.emoji}</div>
-            <h3 style={{ fontWeight: 700, marginBottom: 8 }}>{r.title}</h3>
-            <p style={{ fontSize: 14, color: "var(--text-muted)" }}>{r.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function SettingsPage() {
@@ -1819,229 +1939,6 @@ function SettingsPage() {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── Dual-Theme UI/UX Showcase ────────────────────────────────────────────────
-function DesignShowcase({ theme, toggleTheme, setTab }) {
-  const [copiedHex, setCopiedHex] = useState(null);
-
-  function copy(hex) {
-    navigator.clipboard?.writeText(hex);
-    setCopiedHex(hex);
-    setTimeout(() => setCopiedHex(null), 1800);
-  }
-
-  return (
-    <div className="fade-in">
-      <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
-        <div>
-          <div className="section-eyebrow">Warm Organic Design System</div>
-          <h1 className="section-title">Dual-Theme UI/UX Showcase</h1>
-          <p className="section-desc">
-            A strictly warm, organic, and earthy presentation with absolutely zero blue, purple, violet, or neon colors.
-            Side-by-side comparison of <strong>Light Mode (Espresso & Cream)</strong> and <strong>Dark Mode (Rich Walnut / Dark Academia)</strong>.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button className="theme-toggle-btn" onClick={toggleTheme}>
-            <Icon name={theme === "light" ? "Moon" : "Sun"} size={16} />
-            <span>Switch Current View to {theme === "light" ? "Rich Walnut (Dark)" : "Espresso & Cream (Light)"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Side-by-Side Presentation */}
-      <div className="showcase-container">
-        {/* Left Side: Light Mode (Espresso & Cream) */}
-        <div className="showcase-half light-side">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(140, 98, 57, 0.2)", paddingBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "#8C6239" }}>Theme Showcase</div>
-              <h2 style={{ fontSize: 20, fontWeight: 900, color: "#1C120C", margin: "2px 0 0" }}>Light Mode · Espresso & Cream</h2>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: "rgba(140, 98, 57, 0.12)", color: "#8C6239" }}>
-              #FBF9F6 Canvas
-            </span>
-          </div>
-
-          {/* Mini Dashboard Frame */}
-          <div style={{ background: "#F3EFEA", borderRadius: 14, padding: 20, border: "1px solid rgba(140, 98, 57, 0.2)", boxShadow: "0 2px 12px rgba(28,18,12,0.06)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: "#8C6239", color: "#FFF", display: "grid", placeItems: "center", fontSize: 14, fontWeight: 800 }}>✦</div>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#1C120C" }}>PrepForge Dashboard</span>
-              </div>
-              <button style={{ background: "#8C6239", color: "#FFFFFF", border: "none", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                + Primary CTA
-              </button>
-            </div>
-
-            {/* Metric Cards Row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-              <div style={{ background: "#FBF9F6", padding: 12, borderRadius: 10, border: "1px solid rgba(140, 98, 57, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#5C4E43", textTransform: "uppercase" }}>Readiness</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1C120C", marginTop: 2 }}>92%</div>
-                <div style={{ fontSize: 11, color: "#58644A", fontWeight: 600 }}>+4.5% vs average</div>
-              </div>
-              <div style={{ background: "#FBF9F6", padding: 12, borderRadius: 10, border: "1px solid rgba(140, 98, 57, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#5C4E43", textTransform: "uppercase" }}>AI Accuracy</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1C120C", marginTop: 2 }}>98.4%</div>
-                <div style={{ fontSize: 11, color: "#8C6239", fontWeight: 600 }}>Zero halluncinations</div>
-              </div>
-              <div style={{ background: "#FBF9F6", padding: 12, borderRadius: 10, border: "1px solid rgba(140, 98, 57, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#5C4E43", textTransform: "uppercase" }}>Interview Turns</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1C120C", marginTop: 2 }}>24</div>
-                <div style={{ fontSize: 11, color: "#5C4E43" }}>Across 3 sessions</div>
-              </div>
-            </div>
-
-            {/* Organic SVG Chart */}
-            <div style={{ background: "#FBF9F6", padding: 14, borderRadius: 10, border: "1px solid rgba(140, 98, 57, 0.16)" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#1C120C", marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
-                <span>Skill Progression & Velocity</span>
-                <span style={{ color: "#8C6239", fontWeight: 600, fontSize: 11 }}>Weekly Trajectory</span>
-              </div>
-              <svg width="100%" height="70" viewBox="0 0 320 70" fill="none">
-                <path d="M 0 55 Q 50 40 90 48 T 180 25 T 260 30 T 320 10 L 320 70 L 0 70 Z" fill="rgba(140, 98, 57, 0.12)" />
-                <path d="M 0 55 Q 50 40 90 48 T 180 25 T 260 30 T 320 10" stroke="#8C6239" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="180" cy="25" r="4" fill="#8C6239" />
-                <circle cx="320" cy="10" r="4" fill="#8C6239" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Palette Spec Breakdown */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F3EFEA", borderRadius: 8, border: "1px solid rgba(140, 98, 57, 0.2)", cursor: "pointer" }} onClick={() => copy("#FBF9F6")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#FBF9F6", border: "1px solid #EAE3DA" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1C120C" }}>Canvas Background</div>
-                <code style={{ fontSize: 11, color: "#5C4E43" }}>#FBF9F6</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F3EFEA", borderRadius: 8, border: "1px solid rgba(140, 98, 57, 0.2)", cursor: "pointer" }} onClick={() => copy("#F3EFEA")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#F3EFEA", border: "1px solid #D8CFC4" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1C120C" }}>Surface Container</div>
-                <code style={{ fontSize: 11, color: "#5C4E43" }}>#F3EFEA</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F3EFEA", borderRadius: 8, border: "1px solid rgba(140, 98, 57, 0.2)", cursor: "pointer" }} onClick={() => copy("#1C120C")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1C120C" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1C120C" }}>Deep Espresso Text</div>
-                <code style={{ fontSize: 11, color: "#5C4E43" }}>#1C120C</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#F3EFEA", borderRadius: 8, border: "1px solid rgba(140, 98, 57, 0.2)", cursor: "pointer" }} onClick={() => copy("#8C6239")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#8C6239" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#1C120C" }}>Interactive CTA</div>
-                <code style={{ fontSize: 11, color: "#5C4E43" }}>#8C6239</code>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Dark Mode (Rich Walnut / Dark Academia) */}
-        <div className="showcase-half dark-side">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(212, 163, 115, 0.2)", paddingBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", color: "#D4A373" }}>Theme Showcase</div>
-              <h2 style={{ fontSize: 20, fontWeight: 900, color: "#F5EFE6", margin: "2px 0 0" }}>Dark Mode · Rich Walnut</h2>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: "rgba(212, 163, 115, 0.14)", color: "#D4A373" }}>
-              #141210 Canvas
-            </span>
-          </div>
-
-          {/* Mini Dashboard Frame */}
-          <div style={{ background: "#1C1916", borderRadius: 14, padding: 20, border: "1px solid rgba(212, 163, 115, 0.22)", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: "#D4A373", color: "#141210", display: "grid", placeItems: "center", fontSize: 14, fontWeight: 900 }}>✦</div>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#F5EFE6" }}>PrepForge Dashboard</span>
-              </div>
-              <button style={{ background: "#D4A373", color: "#141210", border: "none", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                + Primary CTA
-              </button>
-            </div>
-
-            {/* Metric Cards Row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
-              <div style={{ background: "#24201C", padding: 12, borderRadius: 10, border: "1px solid rgba(212, 163, 115, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#B8AF9F", textTransform: "uppercase" }}>Readiness</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#F5EFE6", marginTop: 2 }}>92%</div>
-                <div style={{ fontSize: 11, color: "#A5A58D", fontWeight: 600 }}>+4.5% vs average</div>
-              </div>
-              <div style={{ background: "#24201C", padding: 12, borderRadius: 10, border: "1px solid rgba(212, 163, 115, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#B8AF9F", textTransform: "uppercase" }}>AI Accuracy</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#F5EFE6", marginTop: 2 }}>98.4%</div>
-                <div style={{ fontSize: 11, color: "#D4A373", fontWeight: 600 }}>Zero hallucinations</div>
-              </div>
-              <div style={{ background: "#24201C", padding: 12, borderRadius: 10, border: "1px solid rgba(212, 163, 115, 0.16)" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#B8AF9F", textTransform: "uppercase" }}>Interview Turns</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#F5EFE6", marginTop: 2 }}>24</div>
-                <div style={{ fontSize: 11, color: "#7A7264" }}>Across 3 sessions</div>
-              </div>
-            </div>
-
-            {/* Organic SVG Chart */}
-            <div style={{ background: "#24201C", padding: 14, borderRadius: 10, border: "1px solid rgba(212, 163, 115, 0.16)" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#F5EFE6", marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
-                <span>Skill Progression & Velocity</span>
-                <span style={{ color: "#D4A373", fontWeight: 600, fontSize: 11 }}>Weekly Trajectory</span>
-              </div>
-              <svg width="100%" height="70" viewBox="0 0 320 70" fill="none">
-                <path d="M 0 55 Q 50 40 90 48 T 180 25 T 260 30 T 320 10 L 320 70 L 0 70 Z" fill="rgba(212, 163, 115, 0.12)" />
-                <path d="M 0 55 Q 50 40 90 48 T 180 25 T 260 30 T 320 10" stroke="#D4A373" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="180" cy="25" r="4" fill="#D4A373" />
-                <circle cx="320" cy="10" r="4" fill="#D4A373" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Palette Spec Breakdown */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#1C1916", borderRadius: 8, border: "1px solid rgba(212, 163, 115, 0.2)", cursor: "pointer" }} onClick={() => copy("#141210")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#141210", border: "1px solid #24201C" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#F5EFE6" }}>Canvas Background</div>
-                <code style={{ fontSize: 11, color: "#B8AF9F" }}>#141210</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#1C1916", borderRadius: 8, border: "1px solid rgba(212, 163, 115, 0.2)", cursor: "pointer" }} onClick={() => copy("#1C1916")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1C1916", border: "1px solid #2E2924" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#F5EFE6" }}>Elevated Surface</div>
-                <code style={{ fontSize: 11, color: "#B8AF9F" }}>#1C1916</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#1C1916", borderRadius: 8, border: "1px solid rgba(212, 163, 115, 0.2)", cursor: "pointer" }} onClick={() => copy("#F5EFE6")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#F5EFE6" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#F5EFE6" }}>Soft Ivory Text</div>
-                <code style={{ fontSize: 11, color: "#B8AF9F" }}>#F5EFE6</code>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#1C1916", borderRadius: 8, border: "1px solid rgba(212, 163, 115, 0.2)", cursor: "pointer" }} onClick={() => copy("#D4A373")}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#D4A373" }} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#F5EFE6" }}>Interactive Accent</div>
-                <code style={{ fontSize: 11, color: "#B8AF9F" }}>#D4A373</code>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {copiedHex && (
-        <div style={{ marginTop: 14, textAlign: "center", fontSize: 13, color: "var(--accent)", fontWeight: 600 }}>
-          Copied {copiedHex} to clipboard!
-        </div>
-      )}
     </div>
   );
 }
